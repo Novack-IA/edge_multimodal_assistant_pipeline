@@ -26,9 +26,11 @@ vad:                      # Silero VAD (doc 04)
   speech_pad_ms: 100
   barge_in_min_ms: 300    # fala sustentada p/ contar como barge-in (doc 08 §5)
 
-stt:                      # faster-whisper (doc 04)
-  model: large-v3         # large-v3 | large-v3-turbo
-  compute_type: int8      # int8 | int8_float16
+stt:                      # doc 04 (revisado §9: CTranslate2 aarch64 é CPU-only)
+  engine: parakeet        # parakeet (default, GPU real — RTFx 57-90x medido) | faster_whisper (fallback, CPU)
+  parakeet_model: nvidia/parakeet-tdt-0.6b-v3
+  model: large-v3         # usado só por engine=faster_whisper (large-v3 | large-v3-turbo)
+  compute_type: int8      # usado só por engine=faster_whisper (int8 | int8_float16)
   device: cuda
   language: pt
   partial_beam_size: 1

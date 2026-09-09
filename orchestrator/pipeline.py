@@ -21,7 +21,7 @@ from orchestrator.state_machine import ConversationStateMachine
 from services.llm.client import LlmClient
 from services.llm.generation_loop import run_turn
 from services.llm.session import Session
-from services.stt.worker import FasterWhisperStt
+from services.stt import create_stt_engine
 from services.tts.worker import TtsEngine, XttsV2Engine
 from services.vad.silero import SileroEndpointDetector
 from services.vision.capture import CameraProducer, FrameRingBuffer
@@ -44,7 +44,7 @@ class Orchestrator:
         register_builtin_tools(self.tool_registry)
         self.vad_endpoint = SileroEndpointDetector(cfg.vad, sample_rate=cfg.audio.sample_rate)
         self.vad_bargein = SileroEndpointDetector(cfg.vad, sample_rate=cfg.audio.sample_rate)
-        self.stt = FasterWhisperStt(cfg.stt)
+        self.stt = create_stt_engine(cfg.stt)
         self.tts: TtsEngine = tts_engine if tts_engine is not None else XttsV2Engine(cfg.tts)
         self.ring = FrameRingBuffer(maxlen=max(cfg.vision.window_frames * 4, 32))
         self.camera = CameraProducer(cfg.vision, self.ring)

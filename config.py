@@ -41,12 +41,18 @@ class VadConfig(BaseModel):
 
 
 class SttConfig(BaseModel):
-    model: str = "large-v3"
-    compute_type: str = "int8"
+    # engine="parakeet" (default, validado no device — ver docs/04 §9): NeMo +
+    # Parakeet-TDT-0.6B-v3, PyTorch/CUDA nativo, RTFx 57-90x medido no Thor.
+    # engine="faster_whisper": CTranslate2 — o wheel pip para aarch64 não traz
+    # CUDA (só CPU); mantido como fallback documentado (docs/04 §8).
+    engine: Literal["parakeet", "faster_whisper"] = "parakeet"
+    model: str = "large-v3"  # usado só por engine=faster_whisper
+    compute_type: str = "int8"  # usado só por engine=faster_whisper
     device: str = "cuda"
     language: str = "pt"
     partial_beam_size: int = 1
     final_beam_size: int = 5
+    parakeet_model: str = "nvidia/parakeet-tdt-0.6b-v3"  # usado só por engine=parakeet
 
 
 class VisionConfig(BaseModel):

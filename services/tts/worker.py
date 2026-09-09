@@ -41,7 +41,7 @@ def _torchaudio_load_backend_works(torchaudio) -> bool:
             w.writeframes(b"\x00\x00" * 16)
         torchaudio.load(path)
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001 — qualquer falha de backend vira "usar o shim"
         return False
     finally:
         os.unlink(path)
