@@ -28,7 +28,26 @@ from services.vision.capture import CameraProducer, FrameRingBuffer
 from tools.builtin import register_builtin_tools
 from tools.registry import ToolRegistry
 
-SENTENCE_BOUNDARY = (".", "!", "?", "\n")
+# Fronteiras de flush pro TTS (docs/07 §5 "segmentar por frase/cláusula").
+# Medido no device (benchmarks/bench_roundtrip.py): esperar só por ".!?\n"
+# faz o "1o áudio" depender do tamanho da frase inteira que o LLM decidir
+# gerar (~1.6-1.8s medido para uma frase natural de ~60 tokens) — mesmo com
+# TTFT de ~120ms. Literatura/prática de produção (pipelines de voz da
+# LiveKit/Pipecat) corta também em vírgula/ponto-e-vírgula como fallback
+# depois de um mínimo de caracteres, pra limitar o pior caso sem picotar
+# frases curtas em fragmentos desnecessários.
+SENTENCE_END = (".", "!", "?", "\n")
+CLAUSE_END = (",", ";", ":")
+MIN_CHARS_FOR_CLAUSE_FLUSH = 40
+
+
+def is_speakable_chunk_boundary(buffer: str) -> bool:
+    if not buffer:
+        return False
+    last = buffer[-1]
+    if last in SENTENCE_END:
+        return True
+    return last in CLAUSE_END and len(buffer) >= MIN_CHARS_FOR_CLAUSE_FLUSH
 
 
 def pcm_to_f32(pcm: bytes) -> np.ndarray:
@@ -142,7 +161,7 @@ class Orchestrator:
             if first_chunk and buffer.strip():
                 self.sm.enter(TurnState.SPEAKING)
                 first_chunk = False
-            if buffer and buffer[-1] in SENTENCE_BOUNDARY:
+            if is_speakable_chunk_boundary(buffer):
                 await self._speak(buffer, cancel_token)
                 buffer = ""
 
