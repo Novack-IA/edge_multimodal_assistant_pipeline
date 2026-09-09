@@ -17,9 +17,13 @@ dependencies = [
 [project.optional-dependencies]
 # Cada extra é instalado só quando formos rodar aquele serviço de verdade no
 # device (doc 03/13) — mantém o core do orquestrador leve e testável sem GPU.
-vad = ["onnxruntime>=1.18"]
+vad = ["onnxruntime>=1.18", "silero-vad>=5.1"]
 stt = ["faster-whisper>=1.0"]
-tts = ["TTS>=0.22", "torch>=2.2"]
+vision = ["opencv-python-headless>=4.9"]
+# O pacote original `TTS` (coqui-ai/TTS) não é mais mantido e trava em
+# Python <3.12. `coqui-tts` é o fork ativamente mantido (idiap), mesmo
+# namespace de import (`TTS.*`) — ver services/tts/worker.py.
+tts = ["coqui-tts[codec]>=0.27", "torch>=2.2", "transformers>=4.57,<5"]
 orchestration = ["pipecat-ai>=0.0.50"]
 dev = [
     "pytest>=8.0",

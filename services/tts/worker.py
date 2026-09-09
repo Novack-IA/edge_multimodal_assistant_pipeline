@@ -23,6 +23,61 @@ class TtsEngine(Protocol):
     async def warmup(self) -> None: ...
 
 
+def _torchaudio_load_backend_works(torchaudio) -> bool:
+    """`import torchcodec` sozinho não basta — o carregamento da lib nativa
+    (libavutil/FFmpeg) só falha no primeiro uso real. Testa com um WAV
+    mínimo gerado em memória em vez de confiar no import."""
+    import os
+    import tempfile
+    import wave
+
+    fd, path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    try:
+        with wave.open(path, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(16000)
+            w.writeframes(b"\x00\x00" * 16)
+        torchaudio.load(path)
+        return True
+    except Exception:
+        return False
+    finally:
+        os.unlink(path)
+
+
+def _ensure_torchaudio_load_works() -> None:
+    """torch>=2.9 delega `torchaudio.load` ao `torchcodec`, que precisa de
+    FFmpeg (`libavutil.so.*`) instalado no sistema (`apt install ffmpeg`) —
+    ausente neste device por padrão e fora do alcance de instalação
+    automática (requer sudo interativo). Sem isso, `Xtts.get_conditioning_latents`
+    (que só lê um `.wav` para extrair os latents do locutor, docs/07 §3)
+    quebra antes mesmo de tocar em qualquer lógica nossa.
+
+    Shim: se o torchcodec não carregar, troca `torchaudio.load` por uma
+    implementação equivalente via `soundfile` (libsndfile, sem FFmpeg).
+    Remover quando `ffmpeg` estiver instalado no device."""
+    import torchaudio
+
+    if getattr(torchaudio, "_edge_assistant_load_patched", False):
+        return
+
+    if _torchaudio_load_backend_works(torchaudio):
+        return  # torchcodec/FFmpeg funciona neste device — nada a fazer
+
+    import soundfile as sf
+    import torch
+
+    def _load_via_soundfile(filepath, *args, **kwargs):
+        data, sample_rate = sf.read(str(filepath), dtype="float32", always_2d=True)
+        waveform = torch.from_numpy(data.T.copy())  # (channels, samples), como torchaudio.load
+        return waveform, sample_rate
+
+    torchaudio.load = _load_via_soundfile
+    torchaudio._edge_assistant_load_patched = True
+
+
 class XttsV2Engine:
     """Contrato: docs/07 §6. `checkpoint_dir` aponta para os pesos XTTS-v2
     baixados no device (`coqui/XTTS-v2` no Hugging Face) — não versionado
@@ -47,6 +102,8 @@ class XttsV2Engine:
                 "antes de sintetizar de verdade (docs/07). Revisar CPML antes de uso "
                 "comercial (docs/02 NFR-P2)."
             ) from exc
+
+        _ensure_torchaudio_load_works()
 
         config = XttsConfig()
         config.load_json(str(self._checkpoint_dir / "config.json"))
