@@ -1,0 +1,19 @@
+# Unit systemd de referência para o servidor vLLM no Jetson AGX Thor (docs/13).
+# Instalar: sudo cp deployment/vllm.service /etc/systemd/system/ && sudo systemctl daemon-reload
+# Ajustar User/WorkingDirectory/ExecStart ao venv real do device antes de habilitar.
+[Unit]
+Description=vLLM server — LFM2.5-VL-3B (edge-multimodal-assistant)
+After=network.target
+
+[Service]
+Type=simple
+User=thor205
+WorkingDirectory=/home/thor205/edge-multimodal-assistant
+ExecStart=/home/thor205/edge-multimodal-assistant/.venv/bin/python deployment/serve_vllm.py --exec
+Restart=on-failure
+RestartSec=5
+# Primeira subida faz JIT de kernels Triton/FlashInfer para SM_110a (5-15 min) — NFR-R6.
+TimeoutStartSec=1200
+
+[Install]
+WantedBy=multi-user.target

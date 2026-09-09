@@ -1,0 +1,90 @@
+# config.example.yaml — configuração única do assistente multimodal on-device.
+# Copie para config.yaml e ajuste ao device. Nenhuma constante mágica no código:
+# tudo o que for tunável mora aqui (ver CLAUDE.md).
+#
+# Revisado 2026-09-03: cérebro passou de "LFM2.5-2.6B + conector treinado" para
+# "LFM2.5-VL-3B pronto, servido via vLLM" — ver docs/01, docs/06, docs/13.
+
+platform:
+  device: thor             # única plataforma alvo (doc 03)
+  power_mode: max           # fixar nvpmodel/jetson_clocks p/ benchmarks
+  jetpack: "7.x"            # confirmar build exato (nv_tegra_release) no device — visto R39
+  cuda: "13.2"               # confirmado via nvidia-smi em 2026-09-03
+  vllm_version: "TBD"        # pinar versão exata ao instalar (NFR-R5, doc13)
+
+audio:
+  sample_rate: 16000
+  channels: 1
+  frame_ms: 30
+  aec: true               # cancelamento de eco — pré-requisito do barge-in (doc 08)
+  playback_buffer_ms: 30  # pequeno = barge-in rápido (doc 08 §3)
+
+vad:                      # Silero VAD (doc 04)
+  threshold: 0.5
+  min_silence_ms: 600     # endpointing (NFR-L2)
+  min_speech_ms: 150
+  speech_pad_ms: 100
+  barge_in_min_ms: 300    # fala sustentada p/ contar como barge-in (doc 08 §5)
+
+stt:                      # faster-whisper (doc 04)
+  model: large-v3         # large-v3 | large-v3-turbo
+  compute_type: int8      # int8 | int8_float16
+  device: cuda
+  language: pt
+  partial_beam_size: 1
+  final_beam_size: 5
+
+vision:                   # captura + amostragem de frames — SEM encoder próprio (doc 05, doc 09)
+  camera: csi              # csi | usb
+  encode_fps: 2
+  window_frames: 6         # quantas imagens são anexadas à mensagem do turno
+  frame_selection: uniform # uniform | keyframe
+  image_max_side_px: 512   # alinhado ao tiling nativo do modelo (512x512 — doc 05 §2)
+  video_token_budget: 1024 # estimativa de tokens/turno gastos com imagem — calibrar em M1/M2
+
+llm:                       # LFM2.5-VL-3B servido via vLLM (doc 06, doc 13)
+  backbone: LiquidAI/LFM2.5-VL-3B
+  runtime: vllm             # vllm (default) | llama_cpp (fallback — doc13 §8)
+  server_url: http://127.0.0.1:8000/v1
+  tool_call_parser: lfm2    # --tool-call-parser lfm2 no vLLM
+  precision: bf16            # bf16 (default) | fp8 | nvfp4 | gguf_q4_0 | gguf_q4_k_m | gguf_q5_k_m | gguf_q6_k | gguf_q8_0
+  context_length: 32768       # teto REAL do modelo — não aumentar (doc09 §6, doc13 §3)
+  max_new_tokens: 256
+  temperature: 0.5
+  top_p: 0.9
+  tool_temperature: 0.2
+  history_max_turns: 8        # mais conservador que o plano original — contexto menor (32K)
+  summarize_old_turns: true
+  warmup_required: true        # não aceitar turnos antes do turno dummy pós-boot (NFR-R6, doc13 §4)
+  gpu_memory_utilization: 0.5  # fração da GPU reservada pelo vLLM p/ pesos + pool de KV
+
+tts:                      # XTTS-v2 (doc 07)
+  engine: xtts_v2         # interface agnóstica — trocável (plano B de licença)
+  language: pt
+  speaker_wav: assets/reference_voice.wav
+  use_deepspeed: true
+  temperature: 0.65
+  repetition_penalty: 2.0
+  top_k: 50
+  top_p: 0.8
+  speed: 1.0
+
+latency_budgets_ms:       # falha o CI se estourar (doc 02 / doc 11)
+  barge_in_p50: 120
+  barge_in_p95: 200
+  roundtrip_p50: 800
+  roundtrip_p95: 1200
+  llm_ttft_p50: 250          # inclui prefill de imagem (doc02 §2, revisado)
+  tts_ttfb_p50: 200
+  vision_prefill_p50: 40     # fração do TTFT atribuível a imagem (era vision_encode_p50)
+
+cold_start:                 # informativo — não bloqueia CI de turno (NFR-R6, doc13 §4)
+  vllm_warmup_budget_s: 900  # 15 min — 1ª subida faz JIT Triton/FlashInfer p/ SM_110a
+
+tools:
+  timeout_ms: 4000
+  # registrar aqui as ferramentas expostas ao tool calling (doc 06 §3)
+
+licensing:                  # NFR-P2/NFR-P4 (doc 02 §4) — preencher antes de deploy comercial
+  org_annual_revenue_usd: "TBD"   # LFM Open License v1.0: grátis para uso comercial < US$10M/ano
+  xtts_v2_cpml_reviewed: false     # marcar true só após revisão jurídica da CPML

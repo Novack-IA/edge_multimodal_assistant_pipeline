@@ -1,0 +1,27 @@
+# Ambiente
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Config local do device (copiar de config.example.yaml — docs/03, docs/13)
+config.yaml
+
+# Pesos e artefatos grandes — nunca versionar (baixar no device, docs/03/13)
+*.onnx
+*.gguf
+*.ckpt
+*.pt
+*.safetensors
+XTTS-v2/
+assets/*.wav
+!assets/.gitkeep
+
+# vLLM / caches de compilação JIT (docs/13 §4)
+.cache/
+
+# Logs e resultados de benchmark
+*.log
+benchmarks/results/
