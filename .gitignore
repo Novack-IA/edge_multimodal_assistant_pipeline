@@ -26,3 +26,10 @@ assets/*.wav
 # Logs e resultados de benchmark
 *.log
 benchmarks/results/
+
+# Docs internas e relatórios gerados — não versionados (só README.md fica)
+docs/
+reports/
+*.md
+!README.md
+!**/README.md
